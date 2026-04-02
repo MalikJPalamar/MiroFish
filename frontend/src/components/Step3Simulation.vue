@@ -285,7 +285,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -297,21 +297,79 @@ import {
 } from '../api/simulation'
 import { generateReport } from '../api/report'
 
+// Interfaces
+interface ActionArgs {
+  content?: string
+  quote_content?: string
+  original_content?: string
+  original_author_name?: string
+  post_author_name?: string
+  post_content?: string
+  post_id?: string | number
+  query?: string
+  target_user?: string
+  user_id?: string
+}
+
+interface SimAction {
+  _uniqueId?: string
+  id?: string
+  platform: 'twitter' | 'reddit'
+  agent_id?: string
+  agent_name?: string
+  action_type: string
+  action_args?: ActionArgs
+  timestamp?: string | number
+  round_num?: number
+}
+
+interface RunStatus {
+  twitter_running?: boolean
+  twitter_completed?: boolean
+  twitter_current_round?: number
+  twitter_actions_count?: number
+  twitter_simulated_hours?: number
+  reddit_running?: boolean
+  reddit_completed?: boolean
+  reddit_current_round?: number
+  reddit_actions_count?: number
+  reddit_simulated_hours?: number
+  total_rounds?: number
+  runner_status?: string
+  process_pid?: number
+  force_restarted?: boolean
+}
+
+interface SystemLog {
+  time: string
+  msg: string
+}
+
+interface ProjectData {
+  [key: string]: unknown
+}
+
+interface GraphData {
+  [key: string]: unknown
+}
+
 const { t } = useI18n()
 
-const props = defineProps({
-  simulationId: String,
-  maxRounds: Number, // 从Step2传入的最大轮数
-  minutesPerRound: {
-    type: Number,
-    default: 30 // 默认每轮30分钟
-  },
-  projectData: Object,
-  graphData: Object,
-  systemLogs: Array
-})
+const props = defineProps<{
+  simulationId?: string
+  maxRounds?: number
+  minutesPerRound?: number
+  projectData?: ProjectData
+  graphData?: GraphData
+  systemLogs?: SystemLog[]
+}>()
 
-const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])
+const emit = defineEmits<{
+  (e: 'go-back'): void
+  (e: 'next-step'): void
+  (e: 'add-log', msg: string): void
+  (e: 'update-status', status: string): void
+}>()
 
 const router = useRouter()
 
@@ -320,11 +378,11 @@ const isGeneratingReport = ref(false)
 const phase = ref(0) // 0: 未开始, 1: 运行中, 2: 已完成
 const isStarting = ref(false)
 const isStopping = ref(false)
-const startError = ref(null)
-const runStatus = ref({})
-const allActions = ref([]) // 所有动作（增量累积）
-const actionIds = ref(new Set()) // 用于去重的动作ID集合
-const scrollContainer = ref(null)
+const startError = ref<string | null>(null)
+const runStatus = ref<RunStatus>({})
+const allActions = ref<SimAction[]>([]) // 所有动作（增量累积）
+const actionIds = ref<Set<string>>(new Set()) // 用于去重的动作ID集合
+const scrollContainer = ref<HTMLElement | null>(null)
 
 // Computed
 // 按时间顺序显示动作（最新的在最后面，即底部）
@@ -342,9 +400,9 @@ const redditActionsCount = computed(() => {
 })
 
 // 格式化模拟流逝时间（根据轮次和每轮分钟数计算）
-const formatElapsedTime = (currentRound) => {
+const formatElapsedTime = (currentRound: number): string => {
   if (!currentRound || currentRound <= 0) return '0h 0m'
-  const totalMinutes = currentRound * props.minutesPerRound
+  const totalMinutes = currentRound * (props.minutesPerRound ?? 30)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return `${hours}h ${minutes}m`
@@ -395,7 +453,7 @@ const doStartSimulation = async () => {
   emit('update-status', 'processing')
   
   try {
-    const params = {
+    const params: Record<string, unknown> = {
       simulation_id: props.simulationId,
       platform: 'parallel',
       force: true,  // 强制重新开始
@@ -419,7 +477,7 @@ const doStartSimulation = async () => {
       addLog(`  ├─ PID: ${res.data.process_pid || '-'}`)
       
       phase.value = 1
-      runStatus.value = res.data
+      runStatus.value = res.data as RunStatus
       
       startStatusPolling()
       startDetailPolling()
@@ -428,9 +486,10 @@ const doStartSimulation = async () => {
       addLog(t('log.startFailed', { error: res.error || t('common.unknownError') }))
       emit('update-status', 'error')
     }
-  } catch (err) {
-    startError.value = err.message
-    addLog(t('log.startException', { error: err.message }))
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    startError.value = errorMessage
+    addLog(t('log.startException', { error: errorMessage }))
     emit('update-status', 'error')
   } finally {
     isStarting.value = false
@@ -455,16 +514,17 @@ const handleStopSimulation = async () => {
     } else {
       addLog(t('log.stopFailed', { error: res.error || t('common.unknownError') }))
     }
-  } catch (err) {
-    addLog(t('log.stopException', { error: err.message }))
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    addLog(t('log.stopException', { error: errorMessage }))
   } finally {
     isStopping.value = false
   }
 }
 
 // 轮询状态
-let statusTimer = null
-let detailTimer = null
+let statusTimer: ReturnType<typeof setInterval> | null = null
+let detailTimer: ReturnType<typeof setInterval> | null = null
 
 const startStatusPolling = () => {
   statusTimer = setInterval(fetchRunStatus, 2000)
@@ -534,7 +594,7 @@ const fetchRunStatus = async () => {
 }
 
 // 检查所有启用的平台是否已完成
-const checkPlatformsCompleted = (data) => {
+const checkPlatformsCompleted = (data: RunStatus): boolean => {
   // 如果没有任何平台数据，返回 false
   if (!data) return false
   
@@ -544,8 +604,8 @@ const checkPlatformsCompleted = (data) => {
   
   // 如果至少有一个平台完成了，检查是否所有启用的平台都完成了
   // 通过 actions_count 判断平台是否被启用（如果 count > 0 或 running 曾为 true）
-  const twitterEnabled = (data.twitter_actions_count > 0) || data.twitter_running || twitterCompleted
-  const redditEnabled = (data.reddit_actions_count > 0) || data.reddit_running || redditCompleted
+  const twitterEnabled = (!!data.twitter_actions_count && data.twitter_actions_count > 0) || data.twitter_running || twitterCompleted
+  const redditEnabled = (!!data.reddit_actions_count && data.reddit_actions_count > 0) || data.reddit_running || redditCompleted
   
   // 如果没有任何平台被启用，返回 false
   if (!twitterEnabled && !redditEnabled) return false
@@ -565,10 +625,9 @@ const fetchRunStatusDetail = async () => {
     
     if (res.success && res.data) {
       // 使用 all_actions 获取完整的动作列表
-      const serverActions = res.data.all_actions || []
+      const serverActions: SimAction[] = res.data.all_actions || []
       
       // 增量添加新动作（去重）
-      let newActionsAdded = 0
       serverActions.forEach(action => {
         // 生成唯一ID
         const actionId = action.id || `${action.timestamp}-${action.platform}-${action.agent_id}-${action.action_type}`
@@ -579,12 +638,8 @@ const fetchRunStatusDetail = async () => {
             ...action,
             _uniqueId: actionId
           })
-          newActionsAdded++
         }
       })
-      
-      // 不自动滚动，让用户自由查看时间轴
-      // 新动作会在底部追加
     }
   } catch (err) {
     console.warn('获取详细状态失败:', err)
@@ -592,8 +647,8 @@ const fetchRunStatusDetail = async () => {
 }
 
 // Helpers
-const getActionTypeLabel = (type) => {
-  const labels = {
+const getActionTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
     'CREATE_POST': 'POST',
     'REPOST': 'REPOST',
     'LIKE_POST': 'LIKE',
@@ -609,8 +664,8 @@ const getActionTypeLabel = (type) => {
   return labels[type] || type || 'UNKNOWN'
 }
 
-const getActionTypeClass = (type) => {
-  const classes = {
+const getActionTypeClass = (type: string): string => {
+  const classes: Record<string, string> = {
     'CREATE_POST': 'badge-post',
     'REPOST': 'badge-action',
     'LIKE_POST': 'badge-action',
@@ -626,13 +681,13 @@ const getActionTypeClass = (type) => {
   return classes[type] || 'badge-default'
 }
 
-const truncateContent = (content, maxLength = 100) => {
+const truncateContent = (content: string | undefined, maxLength = 100): string => {
   if (!content) return ''
   if (content.length > maxLength) return content.substring(0, maxLength) + '...'
   return content
 }
 
-const formatActionTime = (timestamp) => {
+const formatActionTime = (timestamp: string | number | undefined): string => {
   if (!timestamp) return ''
   try {
     return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -671,14 +726,15 @@ const handleNextStep = async () => {
       addLog(t('log.reportGenFailed', { error: res.error || t('common.unknownError') }))
       isGeneratingReport.value = false
     }
-  } catch (err) {
-    addLog(t('log.reportGenException', { error: err.message }))
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    addLog(t('log.reportGenException', { error: errorMessage }))
     isGeneratingReport.value = false
   }
 }
 
 // Scroll log to bottom
-const logContent = ref(null)
+const logContent = ref<HTMLElement | null>(null)
 watch(() => props.systemLogs?.length, () => {
   nextTick(() => {
     if (logContent.value) {
