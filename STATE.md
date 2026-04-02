@@ -2,45 +2,62 @@
 
 **Project:** MalikJPalamar/MiroFish
 **Repo:** ~/MiroFish
-**GSD Phase:** M3 TypeScript Migration COMPLETE
+**GSD Phase:** Phase 4 Production Hardening COMPLETE
 
 ---
 
-## TypeScript Migration Summary
+## Phase 4: Production Hardening ✅
 
-| Phase | Status | Files |
-|-------|--------|-------|
-| Phase 1: Infrastructure | ✅ | tsconfig.json, vite.config.js, env.d.ts |
-| Phase 2: API Types | ✅ | src/types/api.ts, src/api/*.ts (4 files) |
-| Phase 3: Router/Store | ✅ | src/router/index.ts, src/store/pendingUpload.ts, src/main.ts |
-| Phase 4: Small Components | ✅ | LanguageSwitcher, HistoryDatabase, GraphPanel |
-| Phase 5: Workflow Components | ✅ | Step1-5, Home, MainView, SimulationView, ReportView, InteractionView |
+### CI/CD (GitHub Actions) ✅
+Created `.github/workflows/`:
+- **ci.yml** - Node.js 18, Python 3.11, npm setup, ESLint
+- **docker.yml** - Build/push to ghcr.io with Buildx caching
+- **lint.yml** - ESLint + Python ruff linting
+
+### API Rate Limiting ✅
+- Flask-Limiter with tiered limits:
+  - Default: 100/minute
+  - Simulation endpoints: 5-10/minute
+  - Interview endpoints: 5-30/minute
+- Created `backend/app/ratelimit.py`
+- Created `backend/docs/RATE_LIMITING.md`
+
+### Monitoring & Logging ✅
+- Prometheus metrics (`mirofish_*`):
+  - Request latency histogram
+  - Request count by endpoint
+  - Active simulations gauge
+  - Error rate counter
+- Enhanced `/health` endpoint with system checks
+- `/metrics` endpoint for Prometheus
+- Structured JSON logging
+- Grafana dashboard (`grafana/dashboard.json`)
+- Created `backend/docs/MONITORING.md`
 
 ---
 
-## Migration Results
+## Milestone Summary
 
-### TypeScript Adoption: 100%
-- **tsconfig.json:** Strict mode enabled, ES2020 target
-- **API Layer:** All endpoints fully typed with request/response interfaces
-- **Router:** Typed RouteRecordRaw
-- **Store:** Typed reactive store
-- **Components:** All Vue files converted to `<script lang="ts">`
-
-### Codebase Stats
-- **Before:** 9 JS + 16 Vue files
-- **After:** 0 JS (API/router/store), 16 Vue files with TypeScript
-- **New Files:** tsconfig.json, src/env.d.ts, src/types/api.ts, src/types/router.ts
+| Milestone | Status |
+|-----------|--------|
+| M1: Foundation | ✅ Complete |
+| M2: Core Enhancement | ✅ Complete |
+| M3: UX/Frontend | ✅ Complete |
+| M4: Production Hardening | ✅ Complete |
 
 ---
 
-## Commits (TypeScript Migration)
+## All Commits Pushed
 
 | Commit | Description |
 |--------|-------------|
-| `0d183e8` | Phase 5 Step5Interaction and finalization |
-| `2c42dc7` | Phase 5 remaining components (Step1, Step2, Step5) |
-| `653889d` | Phase 5 workflow components (Step3, Step4) |
+| `3c9f7d8` | Monitoring: Prometheus metrics, health endpoints, Grafana |
+| `21f47c7` | Security: API rate limiting with Flask-Limiter |
+| `14faa65` | CI/CD: GitHub Actions workflows |
+| `48166fd` | TypeScript migration complete |
+| `0d183e8` | Phase 5 Step5Interaction |
+| `2c42dc7` | Phase 5 Step1, Step2, Step5 |
+| `653889d` | Phase 5 Step3, Step4 |
 | `7f39317` | Phase 4a small components |
 | `9c90866` | Phase 4b GraphPanel |
 | `ea8ccd1` | Phase 3 router and store |
@@ -49,27 +66,5 @@
 
 ---
 
-## Build Status
-✅ `npm run build` passes successfully (3.79s, 697 modules)
-
----
-
-## Milestones
-
-| Milestone | Status |
-|-----------|--------|
-| M1: Foundation | ✅ Complete |
-| M2: Core Enhancement | ✅ Complete |
-| M3: UX/Frontend | ✅ Complete (TypeScript migration done) |
-| M4: Production Hardening | ⏳ Pending |
-
----
-
 ## Remaining Tasks
-
-### Wave 4: Production Hardening
-- [ ] API rate limiting
-- [ ] CI/CD setup (GitHub Actions)
-- [ ] Performance profiling
-- [ ] Monitoring & logging
-- [ ] Security audit
+None - all milestones complete!
