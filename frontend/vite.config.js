@@ -4,7 +4,14 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue({
+      script: {
+        defineModel: true,
+        propsDestructure: true
+      }
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
