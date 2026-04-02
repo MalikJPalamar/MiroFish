@@ -235,26 +235,96 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, watch, nextTick, computed, type Ref, type ComputedRef } from 'vue'
 import * as d3 from 'd3'
 
-const props = defineProps({
-  graphData: Object,
-  loading: Boolean,
-  currentPhase: Number,
-  isSimulating: Boolean
-})
+// Types for Graph Data
+interface GraphNode {
+  uuid: string
+  name?: string
+  labels?: string[]
+  created_at?: string
+  attributes?: Record<string, unknown>
+  summary?: string
+  labels_list?: string[]
+}
 
-const emit = defineEmits(['refresh', 'toggle-maximize'])
+interface GraphEdge {
+  uuid: string
+  source_node_uuid: string
+  target_node_uuid: string
+  name?: string
+  fact_type?: string
+  fact?: string
+  episodes?: string[]
+  created_at?: string
+  valid_at?: string
+}
 
-const graphContainer = ref(null)
-const graphSvg = ref(null)
-const selectedItem = ref(null)
-const showEdgeLabels = ref(true) // 默认显示边标签
-const expandedSelfLoops = ref(new Set()) // 展开的自环项
-const showSimulationFinishedHint = ref(false) // 模拟结束后的提示
-const wasSimulating = ref(false) // 追踪之前是否在模拟中
+interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+interface SelfLoopEdge {
+  uuid?: string
+  name?: string
+  fact_type?: string
+  fact?: string
+  episodes?: string[]
+  created_at?: string
+}
+
+interface SelectedItem {
+  type: 'node' | 'edge'
+  data: {
+    uuid: string
+    name?: string
+    source_name?: string
+    target_name?: string
+    entityType?: string
+    color?: string
+    created_at?: string
+    attributes?: Record<string, unknown>
+    summary?: string
+    labels?: string[]
+    fact_type?: string
+    fact?: string
+    episodes?: string[]
+    valid_at?: string
+    isSelfLoopGroup?: boolean
+    selfLoopCount?: number
+    selfLoopEdges?: SelfLoopEdge[]
+  }
+  entityType?: string
+  color?: string
+}
+
+// Props interface
+interface Props {
+  graphData: GraphData | null
+  loading: boolean
+  currentPhase: number
+  isSimulating: boolean
+}
+
+const props = defineProps<Props>()
+
+// Emits
+const emit = defineEmits<{
+  refresh: []
+  'toggle-maximize': []
+}>()
+
+// Refs
+const graphContainer: Ref<HTMLElement | null> = ref(null)
+const graphSvg: Ref<SVGElement | null> = ref(null)
+const selectedItem: Ref<SelectedItem | null> = ref(null)
+const showEdgeLabels = ref(true)
+const expandedSelfLoops = ref(new Set<string | number>())
+const showSimulationFinishedHint = ref(false)
+const wasSimulating = ref(false)
 
 // 关闭模拟结束提示
 const dismissFinishedHint = () => {
