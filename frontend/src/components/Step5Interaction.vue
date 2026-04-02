@@ -410,66 +410,75 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { chatWithReport, getReport, getAgentLog } from '../api/report'
 import { interviewAgents, getSimulationProfilesRealtime } from '../api/simulation'
+import type { AgentProfile, ChatMessage } from '../types/api'
 
 const { t } = useI18n()
 
-const props = defineProps({
-  reportId: String,
-  simulationId: String
+interface Props {
+  reportId?: string
+  simulationId?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  reportId: '',
+  simulationId: ''
 })
 
-const emit = defineEmits(['add-log', 'update-status'])
+const emit = defineEmits<{
+  'add-log': [msg: string]
+  'update-status': [status: string]
+}>()
 
 // State
-const activeTab = ref('chat')
-const chatTarget = ref('report_agent')
+const activeTab = ref<'chat' | 'survey'>('chat')
+const chatTarget = ref<'report_agent' | 'agent'>('report_agent')
 const showAgentDropdown = ref(false)
-const selectedAgent = ref(null)
-const selectedAgentIndex = ref(null)
+const selectedAgent = ref<AgentProfile | null>(null)
+const selectedAgentIndex = ref<number | null>(null)
 const showFullProfile = ref(true)
 const showToolsDetail = ref(true)
 
 // Chat State
 const chatInput = ref('')
-const chatHistory = ref([])
-const chatHistoryCache = ref({}) // 缓存所有对话记录: { 'report_agent': [], 'agent_0': [], 'agent_1': [], ... }
+const chatHistory = ref<ChatMessage[]>([])
+const chatHistoryCache = ref<Record<string, ChatMessage[]>>({})
 const isSending = ref(false)
-const chatMessages = ref(null)
-const chatInputRef = ref(null)
+const chatMessages = ref<ChatMessage[] | null>(null)
+const chatInputRef = ref<HTMLInputElement | null>(null)
 
 // Survey State
-const selectedAgents = ref(new Set())
+const selectedAgents = ref(new Set<string>())
 const surveyQuestion = ref('')
-const surveyResults = ref([])
+const surveyResults = ref<Record<string, unknown>>([])
 const isSurveying = ref(false)
 
 // Report Data
-const reportOutline = ref(null)
-const generatedSections = ref({})
-const collapsedSections = ref(new Set())
-const currentSectionIndex = ref(null)
-const profiles = ref([])
+const reportOutline = ref<{ title: string; summary: string; sections: Array<{ title: string }> } | null>(null)
+const generatedSections = ref<Record<number, string>>({})
+const collapsedSections = ref(new Set<number>())
+const currentSectionIndex = ref<number | null>(null)
+const profiles = ref<AgentProfile[]>([])
 
 // Helper Methods
-const isSectionCompleted = (sectionIndex) => {
+const isSectionCompleted = (sectionIndex: number): boolean => {
   return !!generatedSections.value[sectionIndex]
 }
 
 // Refs
-const leftPanel = ref(null)
-const rightPanel = ref(null)
+const leftPanel = ref<HTMLElement | null>(null)
+const rightPanel = ref<HTMLElement | null>(null)
 
 // Methods
-const addLog = (msg) => {
+const addLog = (msg: string): void => {
   emit('add-log', msg)
 }
 
-const toggleSectionCollapse = (idx) => {
+const toggleSectionCollapse = (idx: number): void => {
   if (!generatedSections.value[idx + 1]) return
   const newSet = new Set(collapsedSections.value)
   if (newSet.has(idx)) {
@@ -480,7 +489,7 @@ const toggleSectionCollapse = (idx) => {
   collapsedSections.value = newSet
 }
 
-const selectChatTarget = (target) => {
+const selectChatTarget = (target: 'report_agent' | 'agent'): void => {
   chatTarget.value = target
   if (target === 'report_agent') {
     showAgentDropdown.value = false
@@ -527,7 +536,7 @@ const toggleAgentDropdown = () => {
   }
 }
 
-const selectAgent = (agent, idx) => {
+const selectAgent = (agent: AgentProfile, idx: number): void => {
   // 保存当前对话记录
   saveChatHistory()
   
