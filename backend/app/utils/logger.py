@@ -1,13 +1,47 @@
 """
 日志配置模块
 提供统一的日志管理，同时输出到控制台和文件
+支持结构化JSON日志格式，便于日志收集和分析
 """
 
 import os
 import sys
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
+
+
+class StructuredLogFormatter(logging.Formatter):
+    """
+    结构化JSON日志格式化器
+    将日志转换为JSON格式，便于日志收集系统（如ELK、Loki）解析
+    """
+    
+    def __init__(self, include_extra=True):
+        super().__init__()
+        self.include_extra = include_extra
+    
+    def format(self, record):
+        log_data = {
+            'timestamp': datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'module': record.module,
+            'function': record.funcName,
+            'line': record.lineno,
+        }
+        
+        # 添加异常信息
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+        
+        # 添加额外字段
+        if self.include_extra and hasattr(record, 'extra_fields'):
+            log_data.update(record.extra_fields)
+        
+        return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
 def _ensure_utf8_stdout():
@@ -26,8 +60,11 @@ def _ensure_utf8_stdout():
 # 日志目录
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
 
+# 是否启用JSON格式日志（用于生产环境）
+USE_JSON_LOGGING = os.environ.get('USE_JSON_LOGGING', 'false').lower() == 'true'
 
-def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.Logger:
+
+def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG, use_json: bool = None) -> logging.Logger:
     """
     设置日志器
     
@@ -53,15 +90,23 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
         return logger
     
     # 日志格式
-    detailed_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    # 决定是否使用JSON格式
+    should_use_json = use_json if use_json is not None else USE_JSON_LOGGING
     
-    simple_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%H:%M:%S'
-    )
+    if should_use_json:
+        # JSON格式 - 用于生产环境和日志收集系统
+        file_formatter = StructuredLogFormatter(include_extra=True)
+        console_formatter = StructuredLogFormatter(include_extra=True)
+    else:
+        # 文本格式 - 用于开发环境
+        file_formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s: %(message)s',
+            datefmt='%H:%M:%S'
+        )
     
     # 1. 文件处理器 - 详细日志（按日期命名，带轮转）
     log_filename = datetime.now().strftime('%Y-%m-%d') + '.log'
@@ -72,14 +117,14 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
         encoding='utf-8'
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(detailed_formatter)
+    file_handler.setFormatter(file_formatter)
     
     # 2. 控制台处理器 - 简洁日志（INFO及以上）
     # 确保 Windows 下使用 UTF-8 编码，避免中文乱码
     _ensure_utf8_stdout()
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
+    console_handler.setFormatter(console_formatter)
     
     # 添加处理器
     logger.addHandler(file_handler)
@@ -123,4 +168,21 @@ def error(msg, *args, **kwargs):
 
 def critical(msg, *args, **kwargs):
     logger.critical(msg, *args, **kwargs)
+
+
+def log_structured(level: int, msg: str, **kwargs):
+    """
+    结构化日志记录方法
+    
+    Args:
+        level: 日志级别 (logging.DEBUG, logging.INFO, etc.)
+        msg: 日志消息
+        **kwargs: 额外的结构化字段
+    
+    Example:
+        log_structured(logging.INFO, "用户登录成功", user_id="123", ip="192.168.1.1")
+    """
+    extra = kwargs.get('extra', {})
+    extra['extra_fields'] = {k: v for k, v in kwargs.items() if k != 'extra'}
+    logger.log(level, msg, extra=extra)
 
