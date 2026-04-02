@@ -186,28 +186,67 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { createSimulation } from '../api/simulation'
 
+// Interfaces
+interface OntologyAttribute {
+  name: string
+  type: string
+  description: string
+}
+
+interface OntologyItem {
+  name: string
+  description: string
+  attributes?: OntologyAttribute[]
+  examples?: string[]
+  source_targets?: Array<{ source: string; target: string }>
+  itemType?: 'entity' | 'relation'
+}
+
+interface GraphData {
+  node_count?: number
+  nodes?: unknown[]
+  edge_count?: number
+  edges?: unknown[]
+}
+
+interface ProjectData {
+  project_id?: string
+  graph_id?: string
+  ontology?: {
+    entity_types?: Array<{ name: string }>
+    edge_types?: Array<{ name: string }>
+  }
+}
+
+interface SystemLog {
+  time: string
+  msg: string
+}
+
 const router = useRouter()
 const { t } = useI18n()
 
-const props = defineProps({
-  currentPhase: { type: Number, default: 0 },
-  projectData: Object,
-  ontologyProgress: Object,
-  buildProgress: Object,
-  graphData: Object,
-  systemLogs: { type: Array, default: () => [] }
-})
+const props = defineProps<{
+  currentPhase?: number
+  projectData?: ProjectData
+  ontologyProgress?: { message?: string }
+  buildProgress?: { progress?: number }
+  graphData?: GraphData
+  systemLogs?: SystemLog[]
+}>()
 
-defineEmits(['next-step'])
+const emit = defineEmits<{
+  (e: 'next-step'): void
+}>()
 
-const selectedOntologyItem = ref(null)
-const logContent = ref(null)
+const selectedOntologyItem = ref<OntologyItem | null>(null)
+const logContent = ref<HTMLElement | null>(null)
 const creatingSimulation = ref(false)
 
 // 进入环境搭建 - 创建 simulation 并跳转
@@ -237,15 +276,16 @@ const handleEnterEnvSetup = async () => {
       console.error('创建模拟失败:', res.error)
       alert(t('step1.createSimulationFailed', { error: res.error || t('common.unknownError') }))
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('创建模拟异常:', err)
-    alert(t('step1.createSimulationException', { error: err.message }))
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    alert(t('step1.createSimulationException', { error: errorMessage }))
   } finally {
     creatingSimulation.value = false
   }
 }
 
-const selectOntologyItem = (item, type) => {
+const selectOntologyItem = (item: OntologyItem, type: 'entity' | 'relation') => {
   selectedOntologyItem.value = { ...item, itemType: type }
 }
 
@@ -256,14 +296,14 @@ const graphStats = computed(() => {
   return { nodes, edges, types }
 })
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string): string => {
   if (!dateStr) return '--:--:--'
   const d = new Date(dateStr)
   return d.toLocaleTimeString('en-US', { hour12: false }) + '.' + d.getMilliseconds()
 }
 
 // Auto-scroll logs
-watch(() => props.systemLogs.length, () => {
+watch(() => props.systemLogs?.length, () => {
   nextTick(() => {
     if (logContent.value) {
       logContent.value.scrollTop = logContent.value.scrollHeight
