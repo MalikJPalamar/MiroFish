@@ -43,7 +43,7 @@
               :title="$t('history.envSetup')"
             >◈</span>
             <span 
-              class="status-icon" 
+              class="status-icon"
               :class="{ available: project.report_id, unavailable: !project.report_id }"
               :title="$t('history.analysisReport')"
             >◆</span>
@@ -190,27 +190,43 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getSimulationHistory } from '../api/simulation'
+
+// Types
+interface ProjectFile {
+  filename: string
+}
+
+interface SimulationProject {
+  simulation_id: string
+  project_id: string | null
+  report_id: string | null
+  simulation_requirement?: string
+  created_at: string
+  current_round?: number
+  total_rounds?: number
+  files?: ProjectFile[]
+}
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 
 // 状态
-const projects = ref([])
+const projects = ref<SimulationProject[]>([])
 const loading = ref(true)
 const isExpanded = ref(false)
-const hoveringCard = ref(null)
-const historyContainer = ref(null)
-const selectedProject = ref(null)  // 当前选中的项目（用于弹窗）
-let observer = null
+const hoveringCard = ref<number | null>(null)
+const historyContainer = ref<HTMLElement | null>(null)
+const selectedProject = ref<SimulationProject | null>(null)
+let observer: IntersectionObserver | null = null
 let isAnimating = false  // 动画锁，防止闪烁
-let expandDebounceTimer = null  // 防抖定时器
-let pendingState = null  // 记录待执行的目标状态
+let expandDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let pendingState: boolean | null = null  // 记录待执行的目标状态
 
 // 卡片布局配置 - 调整为更宽的比例
 const CARDS_PER_ROW = 4
@@ -239,7 +255,7 @@ const containerStyle = computed(() => {
 })
 
 // 获取卡片样式
-const getCardStyle = (index) => {
+const getCardStyle = (index: number) => {
   const total = projects.value.length
   
   if (isExpanded.value) {
@@ -291,7 +307,7 @@ const getCardStyle = (index) => {
 }
 
 // 根据轮数进度获取样式类
-const getProgressClass = (simulation) => {
+const getProgressClass = (simulation: SimulationProject): string => {
   const current = simulation.current_round || 0
   const total = simulation.total_rounds || 0
   
@@ -308,7 +324,7 @@ const getProgressClass = (simulation) => {
 }
 
 // 格式化日期（只显示日期部分）
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string | undefined): string => {
   if (!dateStr) return ''
   try {
     const date = new Date(dateStr)
@@ -319,7 +335,7 @@ const formatDate = (dateStr) => {
 }
 
 // 格式化时间（显示时:分）
-const formatTime = (dateStr) => {
+const formatTime = (dateStr: string | undefined): string => {
   if (!dateStr) return ''
   try {
     const date = new Date(dateStr)
@@ -332,27 +348,27 @@ const formatTime = (dateStr) => {
 }
 
 // 截断文本
-const truncateText = (text, maxLength) => {
+const truncateText = (text: string | undefined, maxLength: number): string => {
   if (!text) return ''
   return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
 }
 
 // 从模拟需求生成标题（取前20字）
-const getSimulationTitle = (requirement) => {
+const getSimulationTitle = (requirement: string | undefined): string => {
   if (!requirement) return t('history.untitledSimulation')
   const title = requirement.slice(0, 20)
   return requirement.length > 20 ? title + '...' : title
 }
 
 // 格式化 simulation_id 显示（截取前6位）
-const formatSimulationId = (simulationId) => {
+const formatSimulationId = (simulationId: string | undefined): string => {
   if (!simulationId) return 'SIM_UNKNOWN'
   const prefix = simulationId.replace('sim_', '').slice(0, 6)
   return `SIM_${prefix.toUpperCase()}`
 }
 
 // 格式化轮数显示（当前轮/总轮数）
-const formatRounds = (simulation) => {
+const formatRounds = (simulation: SimulationProject): string => {
   const current = simulation.current_round || 0
   const total = simulation.total_rounds || 0
   if (total === 0) return t('history.notStarted')
@@ -360,10 +376,10 @@ const formatRounds = (simulation) => {
 }
 
 // 获取文件类型（用于样式）
-const getFileType = (filename) => {
+const getFileType = (filename: string | undefined): string => {
   if (!filename) return 'other'
   const ext = filename.split('.').pop()?.toLowerCase()
-  const typeMap = {
+  const typeMap: Record<string, string> = {
     'pdf': 'pdf',
     'doc': 'doc', 'docx': 'doc',
     'xls': 'xls', 'xlsx': 'xls', 'csv': 'xls',
@@ -372,18 +388,18 @@ const getFileType = (filename) => {
     'jpg': 'img', 'jpeg': 'img', 'png': 'img', 'gif': 'img',
     'zip': 'zip', 'rar': 'zip', '7z': 'zip'
   }
-  return typeMap[ext] || 'other'
+  return (ext && typeMap[ext]) || 'other'
 }
 
 // 获取文件类型标签文本
-const getFileTypeLabel = (filename) => {
+const getFileTypeLabel = (filename: string | undefined): string => {
   if (!filename) return 'FILE'
   const ext = filename.split('.').pop()?.toUpperCase()
   return ext || 'FILE'
 }
 
 // 截断文件名（保留扩展名）
-const truncateFilename = (filename, maxLength) => {
+const truncateFilename = (filename: string | undefined, maxLength: number): string => {
   if (!filename) return t('history.unknownFile')
   if (filename.length <= maxLength) return filename
   
@@ -394,7 +410,7 @@ const truncateFilename = (filename, maxLength) => {
 }
 
 // 打开项目详情弹窗
-const navigateToProject = (simulation) => {
+const navigateToProject = (simulation: SimulationProject) => {
   selectedProject.value = simulation
 }
 
@@ -442,7 +458,9 @@ const loadHistory = async () => {
     loading.value = true
     const response = await getSimulationHistory(20)
     if (response.success) {
-      projects.value = response.data || []
+      // The API returns { simulations: [...], total?: number }
+      // but the component uses projects.value as an array directly
+      projects.value = (response.data as { simulations?: SimulationProject[] })?.simulations || []
     }
   } catch (error) {
     console.error('加载历史项目失败:', error)

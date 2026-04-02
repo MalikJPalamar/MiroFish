@@ -18,17 +18,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { availableLocales } from '@/i18n/index.js'
 
+interface Locale {
+  key: string
+  label: string
+}
+
 const { locale } = useI18n()
 const open = ref(false)
-const switcherRef = ref(null)
+const switcherRef = ref<HTMLElement | null>(null)
 
 const currentLabel = computed(() => {
-  const found = availableLocales.find(l => l.key === locale.value)
+  const found = availableLocales.find((l: Locale) => l.key === locale.value)
   return found ? found.label : locale.value
 })
 
@@ -36,15 +41,15 @@ const toggleDropdown = () => {
   open.value = !open.value
 }
 
-const switchLocale = (key) => {
+const switchLocale = (key: string) => {
   locale.value = key
   localStorage.setItem('locale', key)
   document.documentElement.lang = key
   open.value = false
 }
 
-const onClickOutside = (e) => {
-  if (switcherRef.value && !switcherRef.value.contains(e.target)) {
+const onClickOutside = (e: MouseEvent) => {
+  if (switcherRef.value && !switcherRef.value.contains(e.target as Node)) {
     open.value = false
   }
 }
