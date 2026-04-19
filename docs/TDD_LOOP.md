@@ -3,6 +3,7 @@
 **Last Updated:** 2026-04-19
 **Status:** Active - Cron-driven daily execution
 **Job ID:** 5fd9e33e1798
+**Schedule:** Daily 09:00 UTC = 11:00 CEST (MalikJPalamar's timezone)
 
 ---
 
