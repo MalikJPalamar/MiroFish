@@ -66,5 +66,31 @@ Created `.github/workflows/`:
 
 ---
 
+## 2026-04-25 - TDD: graph_builder + simulation_manager tests
+
+### Task
+Add first TDD test suite for graph_builder and simulation_manager modules
+
+### RED (Test Written)
+- Created: backend/tests/test_graph_builder.py
+- Test: 14 test cases covering GraphInfo, SimulationManager, SimulationState, SimulationStatus
+- Expected: Tests validate existing code — all 14 passed on first run (code already implemented)
+
+### GREEN (Implementation)
+- Changed: backend/pyproject.toml
+- How: Added prometheus-client>=0.20.0 dependency (required by app/__init__.py)
+
+### REFACTOR
+- Created backend/tests/__init__.py
+- All tests pass: 14 passed, 0 failed
+
+### Blockers
+- None
+
+### Tomorrow's Task
+Add TDD tests for Priority 1: app/services/simulation_config_generator.py
+
+---
+
 ## Remaining Tasks
 None - all milestones complete!
