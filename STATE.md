@@ -92,5 +92,30 @@ Add TDD tests for Priority 1: app/services/simulation_config_generator.py
 
 ---
 
+## 2026-04-26 - TDD: simulation_config_generator dataclass tests
+
+### Task
+Add TDD tests for Priority 1: app/services/simulation_config_generator.py dataclasses
+
+### RED (Test Written)
+- Created: backend/tests/test_simulation_config_generator.py
+- Test: 20 test cases covering AgentActivityConfig, TimeSimulationConfig, EventConfig, PlatformConfig, SimulationParameters, CHINA_TIMEZONE_CONFIG, SimulationConfigGenerator class constants and init validation
+- Expected: Tests validate dataclass defaults, to_dict(), to_json(), constants, and API key validation
+
+### GREEN (Implementation)
+- No implementation needed — tests validate existing code behavior
+- All 20 tests pass (validated dataclass structure and methods already implemented)
+
+### REFACTOR
+- None required — code was already clean
+
+### Blockers
+- None
+
+### Tomorrow's Task
+Add TDD tests for Priority 2: app/api/simulation.py
+
+---
+
 ## Remaining Tasks
 None - all milestones complete!
