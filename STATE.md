@@ -119,3 +119,30 @@ Add TDD tests for Priority 2: app/api/simulation.py
 
 ## Remaining Tasks
 None - all milestones complete!
+
+---
+
+## 2026-04-27 - TDD: simulation API optimize_interview_prompt tests
+
+### Task
+Add TDD tests for Priority 2: app/api/simulation.py pure functions
+
+### RED (Test Written)
+- Created: backend/tests/test_simulation_api.py
+- Test: 16 test cases covering optimize_interview_prompt() and INTERVIEW_PROMPT_PREFIX constant
+- Expected: Tests validate existing code — all 16 passed (function already implemented)
+
+### GREEN (Implementation)
+- Fixed: backend/app/ratelimit.py
+- Bug: Removed invalid `add_headers=True` parameter (Flask-Limiter 4.x doesn't support it)
+- Changed: backend/app/ratelimit.py line 18 - removed invalid kwarg
+
+### REFACTOR
+- Created: backend/tests/conftest.py (pytest fixtures for mocking)
+- All tests pass: 87 passed (16 new + 71 existing), 4 pre-existing failures in test_simulation_ipc.py (poll_interval bug)
+
+### Blockers
+- None
+
+### Tomorrow's Task
+Add TDD tests for Priority 2: app/api/simulation.py API endpoints (GET/POST routes)

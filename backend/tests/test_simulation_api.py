@@ -4,37 +4,14 @@ Tests for Simulation API - app/api/simulation.py
 Tests the pure functions and helpers in the simulation API module:
 - optimize_interview_prompt()
 - INTERVIEW_PROMPT_PREFIX constant
-
-Note: We mock the app dependencies (ratelimit, config) to isolate the pure function tests.
 """
 import pytest
 import os
 import json
 import tempfile
-import sys
 from unittest.mock import patch, MagicMock
 
-
-# The INTERVIEW_PROMPT_PREFIX constant we want to test
-INTERVIEW_PROMPT_PREFIX = "结合你的人设、所有的过往记忆与行动，不调用任何工具直接用文本回复我："
-
-
-def optimize_interview_prompt(prompt: str) -> str:
-    """
-    Optimized interview prompt with prefix to avoid agent tool calls.
-
-    Args:
-        prompt: Original prompt
-
-    Returns:
-        Optimized prompt with prefix added
-    """
-    if not prompt:
-        return prompt
-    # Avoid duplicate prefix
-    if prompt.startswith(INTERVIEW_PROMPT_PREFIX):
-        return prompt
-    return f"{INTERVIEW_PROMPT_PREFIX}{prompt}"
+from app.api.simulation import optimize_interview_prompt, INTERVIEW_PROMPT_PREFIX
 
 
 class TestOptimizeInterviewPrompt:
@@ -45,8 +22,8 @@ class TestOptimizeInterviewPrompt:
         result = optimize_interview_prompt("")
         assert result == ""
 
-    def test_returns_empty_string_when_input_none(self):
-        """None prompt returns empty string."""
+    def test_returns_none_when_input_none(self):
+        """None prompt returns None."""
         result = optimize_interview_prompt(None)
         assert result is None
 

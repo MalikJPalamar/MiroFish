@@ -15,7 +15,6 @@ limiter = Limiter(
     default_limits=["100 per minute"],
     storage_uri="memory://",
     strategy="fixed-window",
-    add_headers=True,
     headers_enabled=True,
 )
 
