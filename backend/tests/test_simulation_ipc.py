@@ -429,7 +429,7 @@ class TestSimulationIPCClient:
                 with open(response_file, 'w') as f:
                     json.dump(resp.to_dict(), f)
                 
-                result = client.send_close_env(timeout=1.0, poll_interval=0.01)
+                result = client.send_close_env(timeout=1.0)
                 
                 assert result.status == CommandStatus.COMPLETED
 
