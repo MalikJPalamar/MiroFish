@@ -2724,3 +2724,204 @@ def close_simulation_env():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+# ============== Interview REST Endpoints (simulation_id in URL path) ==============
+
+@simulation_bp.route('/interview/<simulation_id>/question', methods=['POST'])
+@limiter.limit(RATE_LIMITS["simulation_interview"])
+def interview_question(simulation_id: str):
+    """
+    采访单个Agent（REST风格：simulation_id在URL路径中）
+
+    注意：此功能需要模拟环境处于运行状态
+
+    请求（JSON）：
+        {
+            "agent_id": 0,                     // 必填，Agent ID
+            "prompt": "你对这件事有什么看法？",  // 必填，采访问题
+            "platform": "twitter",             // 可选，指定平台（twitter/reddit）
+            "timeout": 60                      // 可选，超时时间（秒），默认60
+        }
+
+    返回：
+        {
+            "success": true,
+            "data": {
+                "agent_id": 0,
+                "prompt": "...",
+                "result": {...}
+            }
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        agent_id = data.get('agent_id')
+        prompt = data.get('prompt')
+        platform = data.get('platform')  # 可选：twitter/reddit/None
+        timeout = data.get('timeout', 60)
+
+        if agent_id is None:
+            return jsonify({
+                "success": False,
+                "error": t('api.requireAgentId')
+            }), 400
+
+        if not prompt:
+            return jsonify({
+                "success": False,
+                "error": t('api.requirePrompt')
+            }), 400
+
+        # 验证platform参数
+        if platform and platform not in ("twitter", "reddit"):
+            return jsonify({
+                "success": False,
+                "error": t('api.invalidInterviewPlatform')
+            }), 400
+
+        # 检查环境状态
+        if not SimulationRunner.check_env_alive(simulation_id):
+            return jsonify({
+                "success": False,
+                "error": t('api.envNotRunning')
+            }), 400
+
+        # 优化prompt，添加前缀避免Agent调用工具
+        optimized_prompt = optimize_interview_prompt(prompt)
+
+        result = SimulationRunner.interview_agent(
+            simulation_id=simulation_id,
+            agent_id=agent_id,
+            prompt=optimized_prompt,
+            platform=platform,
+            timeout=timeout
+        )
+
+        return jsonify({
+            "success": result.get("success", False),
+            "data": result
+        })
+
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
+    except TimeoutError as e:
+        return jsonify({
+            "success": False,
+            "error": t('api.interviewTimeout', error=str(e))
+        }), 504
+
+    except Exception as e:
+        logger.error(f"Interview失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/interview/<simulation_id>/status', methods=['GET'])
+@limiter.limit(RATE_LIMITS["simulation_env"])
+def interview_status(simulation_id: str):
+    """
+    获取Interview环境状态（REST风格）
+
+    检查模拟环境是否存活（可以接收Interview命令）
+
+    返回：
+        {
+            "success": true,
+            "data": {
+                "simulation_id": "sim_xxxx",
+                "env_alive": true,
+                "twitter_available": true,
+                "reddit_available": true,
+                "message": "环境正在运行，可以接收Interview命令"
+            }
+        }
+    """
+    try:
+        env_alive = SimulationRunner.check_env_alive(simulation_id)
+        env_status = SimulationRunner.get_env_status_detail(simulation_id)
+
+        if env_alive:
+            message = t('api.envRunning')
+        else:
+            message = t('api.envNotRunningShort')
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "simulation_id": simulation_id,
+                "env_alive": env_alive,
+                "twitter_available": env_status.get("twitter_available", False),
+                "reddit_available": env_status.get("reddit_available", False),
+                "message": message
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取Interview状态失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/interview/<simulation_id>/close', methods=['POST'])
+@limiter.limit(RATE_LIMITS["simulation_env"])
+def interview_close(simulation_id: str):
+    """
+    关闭模拟环境（REST风格：simulation_id在URL路径中）
+
+    向模拟发送关闭环境命令，使其优雅退出等待命令模式。
+
+    注意：这不同于 /stop 接口，/stop 会强制终止进程，
+    而此接口会让模拟优雅地关闭环境并退出。
+
+    返回：
+        {
+            "success": true,
+            "data": {
+                "message": "环境关闭命令已发送",
+                "result": {...}
+            }
+        }
+    """
+    try:
+        result = SimulationRunner.close_simulation_env(
+            simulation_id=simulation_id,
+            timeout=30
+        )
+
+        # 更新模拟状态
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if state:
+            state.status = SimulationStatus.COMPLETED
+            manager._save_simulation_state(state)
+
+        return jsonify({
+            "success": result.get("success", False),
+            "data": result
+        })
+
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
+    except Exception as e:
+        logger.error(f"关闭环境失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
